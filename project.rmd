@@ -1,0 +1,180 @@
+---
+title: "Project University Art Collection"
+author: "Ivan Pogorelov"
+output: html_document
+---
+
+# Analysis of an art museum catalog to identify inconsistencies, clean the data, and derive insights.
+
+### Load packages and data
+
+```{r load-packages, message = FALSE}
+# Load necessary libraries
+# tidyverse: A collection of R packages for data manipulation and visualization
+# skimr: A package for summarizing data structures and exploring missing data
+library(tidyverse) 
+library(skimr)
+```
+
+```{r load-data, message = FALSE}
+# Load the art museum catalog data from a CSV file.
+# The eval argument is set to FALSE to avoid errors if the file is not yet available.
+# Change eval to TRUE when the file path is set correctly.
+art <- read_csv("data/art.csv")
+```
+
+### Exercise 9
+Clean and transform the art dataset by separating the title and year.  
+Extract the year from the "Title" column and remove parentheses.  
+Convert the extracted year into a numeric format for analysis.  
+Select relevant columns (`Title`, `Artist`, `Year`, `Link`) for further analysis.
+
+```{r ex9}
+art <- art %>%
+  # Split the Title column into "Title" and "Year" based on the opening parenthesis "("
+  separate(Title, into = c("Title", "Year"), sep = "\\(", fill = "right") %>%
+  # Remove the closing parenthesis ")" from the Year column
+  mutate(Year = str_remove(Year, "\\)")) %>%
+  # Convert the Year column to numeric format
+  mutate(Year = as.numeric(Year)) %>%
+  # Retain only the necessary columns
+  select(Title, Artist, Year, Link)
+
+# Preview the cleaned dataset
+head(art)
+```
+
+### Exercise 10
+Summarize the dataset to identify missing values.
+
+```{r ex10}
+# Summary of the art dataset, including missing data patterns
+skim(art)
+```
+
+**Findings:**
+- 68 pieces are missing artist information.
+- 943 pieces are missing year information.
+- These issues highlight data inconsistencies that need further investigation.
+
+### Exercise 11
+Visualize the distribution of artwork years to understand historical trends.  
+A histogram is used to show the count of artworks grouped by decades.
+
+```{r ex11}
+art %>% 
+  ggplot(aes(x = Year)) + 
+  # Use geom_histogram to create a histogram with binwidth set to 10 years
+  geom_histogram(binwidth = 10, fill = "steelblue", color = "black") +
+  labs(title = "Distribution of Artwork Years",
+       x = "Year of Creation",
+       y = "Count of Artworks") +
+  theme_minimal()
+```
+
+### Exercise 12
+Note a specific inconsistency in the data:  
+"Death Mask (2) (1964)" incorrectly captures the year as `2` instead of `1964`.  
+This indicates a parsing error when separating the title and year.
+
+### Exercise 13
+Identify the second most common artist in the collection.
+
+```{r ex13}
+most_common_artist <- art %>%
+  group_by(Artist) %>%         # Group by artist
+  summarize(Count = n()) %>%   # Count the number of artworks per artist
+  arrange(desc(Count)) %>%     # Sort by count in descending order
+  slice(2) %>%                 # Select the second most common artist
+  ungroup()                    # Ungroup the dataset for clarity
+
+# Display the result
+most_common_artist
+```
+
+### Exercise 14
+Count the number of artworks with "child" in the title.  
+Use a case-insensitive search to identify matches.
+
+```{r ex14}
+count_with_child <- art %>%
+  # Filter titles that contain the word "child" (case-insensitive)
+  filter(str_detect(Title, regex("child", ignore_case = TRUE))) %>%
+  # Count the number of matching rows
+  count()
+
+# Display the count
+count_with_child
+```
+
+### Exercise 15
+Visualize the distribution of the number of artworks by artist.  
+Create a bar plot to identify the most prolific artists.
+
+```{r ex15}
+art %>% 
+  group_by(Artist) %>% 
+  summarize(Count = n()) %>% 
+  arrange(desc(Count)) %>% 
+  filter(!is.na(Artist)) %>%  # Filter out missing artist names
+  top_n(10, Count) %>%        # Select the top 10 artists by count
+  ggplot(aes(x = reorder(Artist, Count), y = Count)) +
+  geom_bar(stat = "identity", fill = "steelblue", color = "black") +
+  coord_flip() +
+  labs(title = "Top 10 Most Prolific Artists in the Collection",
+       x = "Artist",
+       y = "Number of Artworks") +
+  theme_minimal()
+```
+
+### Exercise 16
+Visualize the relationship between the year of creation and the number of artworks.  
+Create a scatter plot to identify trends over time.
+
+```{r ex16}
+art %>% 
+  filter(!is.na(Year)) %>%  # Filter out missing year values
+  ggplot(aes(x = Year)) +
+  geom_point(stat = "count", color = "darkred", alpha = 0.6) +
+  labs(title = "Number of Artworks Over Time",
+       x = "Year of Creation",
+       y = "Number of Artworks") +
+  theme_minimal()
+```
+
+### Exercise 17
+Create a heatmap to visualize the missing data patterns.  
+This helps to understand where data is missing and informs data cleaning efforts.
+
+```{r ex17}
+library(reshape2)
+
+# Create a logical matrix of missing data
+missing_data <- is.na(art)
+
+# Convert the matrix into a dataframe for visualization
+missing_data_melted <- melt(missing_data)
+
+# Plot a heatmap of missing data
+missing_data_melted %>%
+  ggplot(aes(x = Var2, y = Var1, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = c("TRUE" = "red", "FALSE" = "grey")) +
+  labs(title = "Heatmap of Missing Data in the Art Collection",
+       x = "Attributes",
+       y = "Records",
+       fill = "Missing") +
+  theme_minimal() +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+```
+
+### Notes
+- **Project Objective**: Analyze and clean a university art museum catalog.  
+- **Key Issues**:
+  - Missing data: Several records lack artist or year information.
+  - Parsing errors: Some entries have incorrect year extraction due to inconsistencies in the "Title" format.
+- **Next Steps**:
+  - Investigate records with missing data.
+  - Manually correct prominent errors, such as "Death Mask (2) (1964)."
+  - Explore trends in the dataset, such as the most common themes or prolific artists.
